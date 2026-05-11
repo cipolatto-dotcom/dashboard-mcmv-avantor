@@ -5,10 +5,15 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Configuração GHL ──────────────────────────────────────────────────────────
-const GHL_TOKEN   = process.env.GHL_TOKEN   || "pit-418240ee-070f-4d8f-bbce-b5d1430444e3";
-const GHL_LOC     = process.env.GHL_LOC     || "eyyWajegyoMiBes1t2RM";
-const GHL_PIPE    = process.env.GHL_PIPE    || "uKcn2E2n2M4kQoGjfx3g";
-const CACHE_TTL   = parseInt(process.env.CACHE_TTL || "60000"); // 60s padrão
+const GHL_TOKEN = process.env.GHL_TOKEN;
+const GHL_LOC   = process.env.GHL_LOC;
+const GHL_PIPE  = process.env.GHL_PIPE;
+const CACHE_TTL = parseInt(process.env.CACHE_TTL || "60000");
+
+if (!GHL_TOKEN || !GHL_LOC || !GHL_PIPE) {
+  console.error("ERRO: variáveis GHL_TOKEN, GHL_LOC e GHL_PIPE são obrigatórias.");
+  process.exit(1);
+}
 
 const STAGES = [
   { id: "cf6c826a-7a17-464f-9dbb-3a2d40c3d76a", name: "Novo Lead"   },
