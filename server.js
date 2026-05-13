@@ -128,6 +128,12 @@ app.get("/", async (req, res) => {
 
   const stTotals = stages.map(s => s.open + s.lost + s.won);
 
+  // Contagem cumulativa: lead em etapa N conta também em todas as anteriores
+  const stCumulative = [...stTotals];
+  for (let i = stCumulative.length - 2; i >= 0; i--) {
+    stCumulative[i] = stTotals[i] + stCumulative[i + 1];
+  }
+
   const periodLabel = (() => {
     if (from && to) return `${from.split("-").reverse().join("/")} → ${to.split("-").reverse().join("/")}`;
     if (from) return `A partir de ${from.split("-").reverse().join("/")}`;
@@ -136,13 +142,10 @@ app.get("/", async (req, res) => {
   })();
 
   // ── Funil SVG estático (trapézios fixos) ─────────────────────────────────────
-  // Novo Lead sempre mostra o total de leads recebidos no período;
-  // cada etapa seguinte usa count_etapa / total para a conversão acumulada.
-  const totalLeads = totals.total;
+  const totalLeads = stCumulative[0]; // = totals.total
 
   const funnelStages = [
-    { name: stages[0].name, count: totalLeads, isGanho: false },
-    ...stages.slice(1).map((s, i) => ({ name: s.name, count: stTotals[i + 1], isGanho: false })),
+    ...stages.map((s, i) => ({ name: s.name, count: stCumulative[i], isGanho: false })),
     { name: "Ganho", count: totals.won, isGanho: true },
   ];
 
@@ -213,11 +216,11 @@ app.get("/", async (req, res) => {
 body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:14px;min-height:100vh}
 
 /* ── Header ──────────────────────────────────────── */
-.hdr{background:#0D234A;height:64px;display:flex;align-items:center;
+.hdr{background:#0D234A;height:80px;display:flex;align-items:center;
      justify-content:space-between;padding:0 28px;
      box-shadow:0 2px 12px rgba(0,0,0,.25)}
 .hdr-l{display:flex;align-items:center}
-.logo-img{height:52px;width:auto;display:block}
+.logo-img{height:68px;width:auto;display:block}
 .hdr-r{display:flex;align-items:center;gap:16px}
 .hdr-pipe{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.04em}
 .live{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.15);
