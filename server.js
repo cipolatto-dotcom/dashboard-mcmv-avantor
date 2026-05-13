@@ -23,7 +23,7 @@ const STAGES = [
   { id: "4a5ff2d0-dd4b-4ac9-bc83-56669cf485cd", name: "Negociação"  },
 ];
 
-// ── Cache de dados brutos (todas as oportunidades) ────────────────────────────
+// ── Cache de dados brutos ─────────────────────────────────────────────────────
 let rawCache = { opps: null, ts: 0 };
 
 async function fetchRawOpps() {
@@ -124,8 +124,7 @@ app.get("/", async (req, res) => {
     hour: "2-digit", minute: "2-digit"
   });
 
-  const stTotals   = stages.map(s => s.open + s.lost + s.won);
-  const firstTotal = Math.max(stTotals[0], 1);
+  const stTotals = stages.map(s => s.open + s.lost + s.won);
 
   const periodLabel = (() => {
     if (from && to) return `${from.split("-").reverse().join("/")} → ${to.split("-").reverse().join("/")}`;
@@ -134,45 +133,63 @@ app.get("/", async (req, res) => {
     return "Todos os dados";
   })();
 
-  // ── Funil ─────────────────────────────────────────────────────────────────
-  const funnelRows = stages.map((s, i) => {
-    const total  = stTotals[i];
-    const barPct = Math.max((total / firstTotal) * 100, total > 0 ? 6 : 1);
+  // ── Funil SVG estático (trapézios fixos) ─────────────────────────────────────
+  const funnelStages = [
+    ...stages.map((s, i) => ({ name: s.name, count: stTotals[i], isGanho: false })),
+    { name: "Ganho", count: totals.won, isGanho: true },
+  ];
 
-    const convCum  = i === 0 ? "100%" : P(total, firstTotal);
-    const convPrev = i === 0 ? "—"    : P(total, stTotals[i - 1]);
+  const SVG_CX  = 300;
+  const MAX_HW  = 260;
+  const MIN_HW  = 78;
+  const N_SL    = funnelStages.length; // 7
+  const STEP    = (MAX_HW - MIN_HW) / N_SL; // 26
+  const SLICE_H = 72;
+  const GAP     = 3;
+  const ROW_H   = SLICE_H + GAP; // 75
+  const SVG_W   = 600;
+  const SVG_H   = N_SL * ROW_H - GAP; // 522
+  const COLORS  = ["#0D234A","#0E2D5C","#12376E","#164180","#1B4B94","#2055A8","#16A34A"];
 
-    const badges = [
-      s.open > 0 ? `<span class="fbadge open">${N(s.open)} aberto</span>` : "",
-      s.won  > 0 ? `<span class="fbadge won">${N(s.won)} ganho</span>`   : "",
-      s.lost > 0 ? `<span class="fbadge lost">${N(s.lost)} perdido</span>` : "",
-    ].filter(Boolean).join("");
+  const firstCount = funnelStages[0].count;
 
-    const connector = i === 0 ? "" : `
-      <div class="conv-row">
-        <div class="conv-line"></div>
-        <div class="conv-pills">
-          <span class="conv-pill total" title="% acumulada em relação ao 1º estágio">
-            &#9654; ${convCum} do total
-          </span>
-          <span class="conv-pill prev" title="% em relação ao estágio anterior">
-            &#8595; ${convPrev} do anterior
-          </span>
-        </div>
-        <div class="conv-line"></div>
-      </div>`;
+  const svgContent = funnelStages.map((fs, i) => {
+    const topHW = MAX_HW - i * STEP;
+    const botHW = MAX_HW - (i + 1) * STEP;
+    const y0    = i * ROW_H;
+    const midY  = y0 + SLICE_H / 2;
 
-    return `${connector}
-    <div class="f-stage">
-      <div class="f-bar" style="width:${barPct}%">
-        <span class="f-name">${s.name}</span>
-        <span class="f-count">${N(total)}</span>
-        <span class="f-badges">${badges}</span>
-      </div>
-    </div>`;
-  }).join("");
+    const pts = `${SVG_CX - topHW},${y0} ${SVG_CX + topHW},${y0} ${SVG_CX + botHW},${y0 + SLICE_H} ${SVG_CX - botHW},${y0 + SLICE_H}`;
 
-  // ── Breakdown ─────────────────────────────────────────────────────────────
+    const prevCount = i > 0 ? funnelStages[i - 1].count : null;
+    const convPrev  = i === 0 ? null
+                    : (prevCount > 0 ? ((fs.count / prevCount) * 100).toFixed(1) + "%" : "0%");
+    const convCum   = i === 0 ? "100%" : (firstCount > 0 ? ((fs.count / firstCount) * 100).toFixed(1) + "%" : "—");
+
+    const nameY  = midY - 21;
+    const countY = midY + 5;
+    const line1Y = midY + 20;
+    const line2Y = midY + 32;
+
+    const nameFill  = fs.isGanho ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)";
+    const sub1Fill  = fs.isGanho ? "rgba(255,255,255,0.8)"  : "rgba(255,255,255,0.65)";
+    const sub2Fill  = fs.isGanho ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.38)";
+
+    let percentText = "";
+    if (i === 0) {
+      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" fill="${sub2Fill}">100% dos leads</text>`;
+    } else {
+      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" font-weight="600" fill="${sub1Fill}">↓ ${convPrev} da etapa anterior</text>
+  <text x="${SVG_CX}" y="${line2Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9" fill="${sub2Fill}">⟳ ${convCum} do total de leads</text>`;
+    }
+
+    return `<polygon points="${pts}" fill="${COLORS[i]}"/>
+  <text x="${SVG_CX}" y="${nameY}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="${nameFill}">${fs.name.toUpperCase()}</text>
+  <text x="${SVG_CX}" y="${countY}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="26" font-weight="700" fill="white">${N(fs.count)}</text>
+  ${percentText}`;
+  }).join("\n  ");
+
+  // ── Breakdown ─────────────────────────────────────────────────────────────────
   const mkBreak = (field, cls) =>
     stages.filter(s => s[field] > 0)
       .map(s => `<div class="brow"><span>${s.name}</span><span class="bn ${cls}">${N(s[field])}</span></div>`)
@@ -186,22 +203,21 @@ app.get("/", async (req, res) => {
 <title>Dashboard MCMV · Avantor Imóveis</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ── Reset ───────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:14px;min-height:100vh}
 
 /* ── Header ──────────────────────────────────────── */
-.hdr{background:#0D234A;height:62px;display:flex;align-items:center;
+.hdr{background:#0D234A;height:64px;display:flex;align-items:center;
      justify-content:space-between;padding:0 28px;
-     box-shadow:0 2px 10px rgba(0,0,0,.2)}
-.hdr-l{display:flex;align-items:center;gap:14px}
-/* ícone V + triângulo */
-.brand-icon{width:38px;height:38px;flex-shrink:0}
-.brand-text{display:flex;flex-direction:column}
-.brand-name{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:700;
-            color:#fff;letter-spacing:.14em;line-height:1}
-.brand-sub{font-size:8.5px;font-weight:500;color:rgba(255,255,255,.45);
-           letter-spacing:.26em;text-transform:uppercase;margin-top:2px}
+     box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.hdr-l{display:flex;align-items:center}
+.logo-mark{position:relative;display:inline-block;line-height:1}
+.logo-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;
+           color:#fff;letter-spacing:.14em}
+.logo-tri{position:absolute;width:9px;height:8px;top:-8px;left:18px}
+.logo-sub{display:block;font-size:8.5px;font-weight:500;
+          color:rgba(255,255,255,.38);letter-spacing:.28em;
+          text-transform:uppercase;margin-top:4px}
 .hdr-r{display:flex;align-items:center;gap:16px}
 .hdr-pipe{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.04em}
 .live{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.15);
@@ -211,14 +227,12 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
      animation:p 1.8s ease-in-out infinite}
 @keyframes p{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
 .hdr-ts{font-size:10.5px;color:rgba(255,255,255,.3)}
-
-/* ── Gold bar ────────────────────────────────────── */
 .gold-bar{height:3px;background:#E6B012}
 
 /* ── Wrap ────────────────────────────────────────── */
 .wrap{max-width:1180px;margin:0 auto;padding:22px 28px}
 
-/* ── Filter bar ──────────────────────────────────── */
+/* ── Filter ──────────────────────────────────────── */
 .filter{background:#fff;border:1px solid #E2E8F0;border-radius:10px;
         padding:12px 18px;display:flex;align-items:center;gap:10px;
         flex-wrap:wrap;margin-bottom:18px}
@@ -226,8 +240,7 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
       letter-spacing:.07em;flex-shrink:0}
 .qbtns{display:flex;gap:5px;flex-wrap:wrap}
 .qb{background:none;border:1px solid #E2E8F0;border-radius:6px;padding:4px 11px;
-    font-size:12px;font-family:'Barlow',sans-serif;color:#0D234A;cursor:pointer;
-    transition:all .15s}
+    font-size:12px;font-family:'Barlow',sans-serif;color:#0D234A;cursor:pointer;transition:all .15s}
 .qb:hover,.qb.on{background:#0D234A;color:#fff;border-color:#0D234A}
 .fsep{width:1px;height:26px;background:#E2E8F0;flex-shrink:0}
 .dinp{display:flex;align-items:center;gap:7px}
@@ -260,39 +273,16 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
 .kpi.k-red .kval{color:#DC2626}
 .ksub{font-size:11px;color:#6B7A99;margin-top:5px}
 
-/* ── Section card ────────────────────────────────── */
+/* ── Section ─────────────────────────────────────── */
 .section{background:#fff;border:1px solid #E2E8F0;border-radius:10px;
          padding:22px 24px;margin-bottom:18px}
 .sec-title{font-size:10px;font-weight:700;color:#6B7A99;text-transform:uppercase;
            letter-spacing:.1em;margin-bottom:22px;display:flex;align-items:center;gap:10px}
 .sec-title::after{content:'';flex:1;height:1px;background:#E2E8F0}
 
-/* ── Funil ───────────────────────────────────────── */
-.funnel{display:flex;flex-direction:column;align-items:center;padding:0 12px}
-.f-stage{width:100%;display:flex;justify-content:center;margin:0}
-.f-bar{background:linear-gradient(135deg,#0D234A 0%,#152f60 100%);
-       border-radius:8px;height:54px;display:flex;align-items:center;
-       padding:0 14px;gap:10px;min-width:140px;transition:width .4s ease}
-.f-name{font-size:12.5px;font-weight:600;color:rgba(255,255,255,.8);
-        white-space:nowrap;min-width:88px;flex-shrink:0}
-.f-count{font-size:22px;font-weight:700;color:#fff;
-         font-family:'Barlow Condensed',sans-serif;min-width:36px;flex-shrink:0}
-.f-badges{display:flex;gap:4px;flex-wrap:wrap}
-.fbadge{font-size:9.5px;padding:2px 7px;border-radius:10px;font-weight:500}
-.fbadge.open{background:rgba(255,255,255,.14);color:rgba(255,255,255,.9)}
-.fbadge.won{background:rgba(22,163,74,.28);color:#86EFAC}
-.fbadge.lost{background:rgba(255,255,255,.07);color:rgba(255,255,255,.4)}
-
-/* ── Conv connector ──────────────────────────────── */
-.conv-row{display:flex;align-items:center;width:100%;height:34px;gap:0}
-.conv-line{flex:1;height:1px;background:#E2E8F0}
-.conv-pills{display:flex;gap:6px;padding:0 10px;flex-shrink:0}
-.conv-pill{font-size:10px;padding:3px 10px;border-radius:12px;
-           font-weight:600;white-space:nowrap;cursor:default}
-.conv-pill.total{background:rgba(13,35,74,.07);color:#0D234A;
-                 border:1px solid rgba(13,35,74,.13)}
-.conv-pill.prev{background:rgba(230,176,18,.12);color:#7A5500;
-                border:1px solid rgba(230,176,18,.35)}
+/* ── Funil SVG ───────────────────────────────────── */
+.funnel-wrap{display:flex;justify-content:center;overflow-x:auto}
+.funnel-wrap svg{max-width:100%;height:auto}
 
 /* ── Breakdown ───────────────────────────────────── */
 .bg3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
@@ -326,14 +316,14 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
 <!-- Header -->
 <header class="hdr">
   <div class="hdr-l">
-    <!-- Ícone: V branco + triângulo dourado -->
-    <svg class="brand-icon" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="19,4 24,14 14,14" fill="#E6B012"/>
-      <polygon points="8,16 14,16 19,30 24,16 30,16 19,36" fill="white"/>
-    </svg>
-    <div class="brand-text">
-      <span class="brand-name">AVANTOR</span>
-      <span class="brand-sub">IMÓVEIS</span>
+    <div>
+      <div class="logo-mark">
+        <span class="logo-name">AVANTOR</span>
+        <svg class="logo-tri" viewBox="0 0 9 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="4.5,0 9,8 0,8" fill="#E6B012"/>
+        </svg>
+      </div>
+      <span class="logo-sub">IMÓVEIS</span>
     </div>
   </div>
   <div class="hdr-r">
@@ -391,11 +381,13 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
     </div>
   </div>
 
-  <!-- Funil -->
+  <!-- Funil SVG -->
   <div class="section">
     <div class="sec-title">Funil de vendas — por etapa</div>
-    <div class="funnel">
-      ${funnelRows}
+    <div class="funnel-wrap">
+      <svg viewBox="0 0 ${SVG_W} ${SVG_H}" width="${SVG_W}" xmlns="http://www.w3.org/2000/svg">
+        ${svgContent}
+      </svg>
     </div>
   </div>
 
@@ -441,7 +433,6 @@ function setMes() {
   nav(fmt2(from), fmt2(now));
 }
 
-// Auto-reload mantendo os filtros da URL
 setTimeout(() => location.reload(), ${CACHE_TTL});
 </script>
 
