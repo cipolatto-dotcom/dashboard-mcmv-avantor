@@ -209,7 +209,7 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
      justify-content:space-between;padding:0 28px;
      box-shadow:0 2px 12px rgba(0,0,0,.25)}
 .hdr-l{display:flex;align-items:center}
-.logo-img{height:36px;width:auto;display:block}
+.logo-img{height:52px;width:auto;display:block}
 .hdr-r{display:flex;align-items:center;gap:16px}
 .hdr-pipe{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.04em}
 .live{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.15);
