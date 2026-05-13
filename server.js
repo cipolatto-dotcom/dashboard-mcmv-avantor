@@ -4,6 +4,8 @@ const fetch   = require("node-fetch");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.static("public"));
+
 const GHL_TOKEN = process.env.GHL_TOKEN;
 const GHL_LOC   = process.env.GHL_LOC;
 const GHL_PIPE  = process.env.GHL_PIPE;
@@ -207,13 +209,7 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
      justify-content:space-between;padding:0 28px;
      box-shadow:0 2px 12px rgba(0,0,0,.25)}
 .hdr-l{display:flex;align-items:center}
-.logo-mark{position:relative;display:inline-block;line-height:1}
-.logo-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;
-           color:#fff;letter-spacing:.14em}
-.logo-tri{position:absolute;width:12px;height:10px;top:-13px;left:16px}
-.logo-sub{display:block;font-size:8.5px;font-weight:500;
-          color:rgba(255,255,255,.38);letter-spacing:.28em;
-          text-transform:uppercase;margin-top:4px}
+.logo-img{height:36px;width:auto;display:block}
 .hdr-r{display:flex;align-items:center;gap:16px}
 .hdr-pipe{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.04em}
 .live{display:flex;align-items:center;gap:5px;background:rgba(22,163,74,.15);
@@ -312,15 +308,7 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
 <!-- Header -->
 <header class="hdr">
   <div class="hdr-l">
-    <div>
-      <div class="logo-mark">
-        <span class="logo-name">AVANTOR</span>
-        <svg class="logo-tri" viewBox="0 0 9 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="4.5,0 9,8 0,8" fill="#E6B012"/>
-        </svg>
-      </div>
-      <span class="logo-sub">IMÓVEIS</span>
-    </div>
+    <img src="/logo.png" alt="Avantor Imóveis" class="logo-img">
   </div>
   <div class="hdr-r">
     <span class="hdr-pipe">Pipeline MCMV</span>
