@@ -134,8 +134,13 @@ app.get("/", async (req, res) => {
   })();
 
   // ── Funil SVG estático (trapézios fixos) ─────────────────────────────────────
+  // Novo Lead sempre mostra o total de leads recebidos no período;
+  // cada etapa seguinte usa count_etapa / total para a conversão acumulada.
+  const totalLeads = totals.total;
+
   const funnelStages = [
-    ...stages.map((s, i) => ({ name: s.name, count: stTotals[i], isGanho: false })),
+    { name: stages[0].name, count: totalLeads, isGanho: false },
+    ...stages.slice(1).map((s, i) => ({ name: s.name, count: stTotals[i + 1], isGanho: false })),
     { name: "Ganho", count: totals.won, isGanho: true },
   ];
 
@@ -151,8 +156,6 @@ app.get("/", async (req, res) => {
   const SVG_H   = N_SL * ROW_H - GAP; // 522
   const COLORS  = ["#0D234A","#0E2D5C","#12376E","#164180","#1B4B94","#2055A8","#16A34A"];
 
-  const firstCount = funnelStages[0].count;
-
   const svgContent = funnelStages.map((fs, i) => {
     const topHW = MAX_HW - i * STEP;
     const botHW = MAX_HW - (i + 1) * STEP;
@@ -161,27 +164,20 @@ app.get("/", async (req, res) => {
 
     const pts = `${SVG_CX - topHW},${y0} ${SVG_CX + topHW},${y0} ${SVG_CX + botHW},${y0 + SLICE_H} ${SVG_CX - botHW},${y0 + SLICE_H}`;
 
-    const prevCount = i > 0 ? funnelStages[i - 1].count : null;
-    const convPrev  = i === 0 ? null
-                    : (prevCount > 0 ? ((fs.count / prevCount) * 100).toFixed(1) + "%" : "0%");
-    const convCum   = i === 0 ? "100%" : (firstCount > 0 ? ((fs.count / firstCount) * 100).toFixed(1) + "%" : "—");
+    // Conversão acumulada: count_etapa / total_leads_recebidos
+    const convCum = i === 0 ? null
+                  : (totalLeads > 0 ? ((fs.count / totalLeads) * 100).toFixed(1) + "%" : "—");
 
-    const nameY  = midY - 21;
-    const countY = midY + 5;
-    const line1Y = midY + 20;
-    const line2Y = midY + 32;
+    const nameY  = midY - 20;
+    const countY = midY + 7;
+    const lineY  = midY + 24;
 
-    const nameFill  = fs.isGanho ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)";
-    const sub1Fill  = fs.isGanho ? "rgba(255,255,255,0.8)"  : "rgba(255,255,255,0.65)";
-    const sub2Fill  = fs.isGanho ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.38)";
+    const nameFill = fs.isGanho ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)";
+    const pctFill  = fs.isGanho ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.7)";
 
-    let percentText = "";
-    if (i === 0) {
-      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" fill="${sub2Fill}">100% dos leads</text>`;
-    } else {
-      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" font-weight="600" fill="${sub1Fill}">↓ ${convPrev} da etapa anterior</text>
-  <text x="${SVG_CX}" y="${line2Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9" fill="${sub2Fill}">⟳ ${convCum} do total de leads</text>`;
-    }
+    const percentText = convCum
+      ? `<text x="${SVG_CX}" y="${lineY}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="10" font-weight="600" fill="${pctFill}">${convCum} do total</text>`
+      : `<text x="${SVG_CX}" y="${lineY}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)">100% — entrada do funil</text>`;
 
     return `<polygon points="${pts}" fill="${COLORS[i]}"/>
   <text x="${SVG_CX}" y="${nameY}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="${nameFill}">${fs.name.toUpperCase()}</text>
@@ -214,7 +210,7 @@ body{font-family:'Barlow',sans-serif;background:#EEF1F7;color:#0D234A;font-size:
 .logo-mark{position:relative;display:inline-block;line-height:1}
 .logo-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;
            color:#fff;letter-spacing:.14em}
-.logo-tri{position:absolute;width:9px;height:8px;top:-8px;left:18px}
+.logo-tri{position:absolute;width:12px;height:10px;top:-13px;left:16px}
 .logo-sub{display:block;font-size:8.5px;font-weight:500;
           color:rgba(255,255,255,.38);letter-spacing:.28em;
           text-transform:uppercase;margin-top:4px}
