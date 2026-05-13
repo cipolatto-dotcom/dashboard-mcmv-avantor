@@ -166,20 +166,28 @@ app.get("/", async (req, res) => {
 
     const pts = `${SVG_CX - topHW},${y0} ${SVG_CX + topHW},${y0} ${SVG_CX + botHW},${y0 + SLICE_H} ${SVG_CX - botHW},${y0 + SLICE_H}`;
 
-    // Conversão acumulada: count_etapa / total_leads_recebidos
-    const convCum = i === 0 ? null
-                  : (totalLeads > 0 ? ((fs.count / totalLeads) * 100).toFixed(1) + "%" : "—");
+    // Conversão acumulada e etapa-a-etapa
+    const prevCount = i > 0 ? funnelStages[i - 1].count : null;
+    const convCum  = i === 0 ? null
+                   : (totalLeads > 0 ? ((fs.count / totalLeads) * 100).toFixed(1) + "%" : "—");
+    const convPrev = i === 0 ? null
+                   : (prevCount > 0 ? ((fs.count / prevCount) * 100).toFixed(1) + "%" : "0%");
 
-    const nameY  = midY - 20;
-    const countY = midY + 7;
-    const lineY  = midY + 24;
+    const nameY  = midY - 22;
+    const countY = midY + 4;
+    const line1Y = midY + 19;
+    const line2Y = midY + 31;
 
-    const nameFill = fs.isGanho ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)";
-    const pctFill  = fs.isGanho ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.7)";
+    const nameFill  = fs.isGanho ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)";
+    const pct1Fill  = fs.isGanho ? "rgba(255,255,255,0.9)"  : "rgba(255,255,255,0.75)";
+    const pct2Fill  = fs.isGanho ? "rgba(255,255,255,0.6)"  : "rgba(255,255,255,0.42)";
 
-    const percentText = convCum
-      ? `<text x="${SVG_CX}" y="${lineY}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="10" font-weight="600" fill="${pctFill}">${convCum} do total</text>`
-      : `<text x="${SVG_CX}" y="${lineY}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)">100% — entrada do funil</text>`;
+    let percentText;
+    if (i === 0) {
+      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)">100% — entrada do funil</text>`;
+    } else {
+      percentText = `<text x="${SVG_CX}" y="${line1Y}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="10" font-weight="600" fill="${pct1Fill}">↓ ${convPrev} da etapa ant. · ${convCum} do total</text>`;
+    }
 
     return `<polygon points="${pts}" fill="${COLORS[i]}"/>
   <text x="${SVG_CX}" y="${nameY}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="10" font-weight="600" letter-spacing="2" fill="${nameFill}">${fs.name.toUpperCase()}</text>
